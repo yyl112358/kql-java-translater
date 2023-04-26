@@ -74,7 +74,7 @@ public class PerReadAbleLexicalAnalysis extends LexicalAnalysis{
     }
 
     /**
-     * 向后预读一个token ，但不移动当前消费到的token的位置,此操作不印象pervToken的值，pervToken仍为预读前的值
+     * 向后预读一个token ，但不移动当前消费到的token的位置,此操作不影响pervToken的值，pervToken仍为预读前的值
      * @return 预读到的token或null(token流已空)
      */
     public Token perReadToken(){

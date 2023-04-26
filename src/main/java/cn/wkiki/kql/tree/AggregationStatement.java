@@ -3,6 +3,9 @@ package cn.wkiki.kql.tree;
 
 import cn.wkiki.kql.Token;
 
+/**
+ * 聚合计算表达式
+ */
 public interface AggregationStatement {
 
     void setFilterTree(TreeNode filterTree);

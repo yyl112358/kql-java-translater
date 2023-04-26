@@ -6,15 +6,17 @@ import cn.wkiki.kql.TranslateContext;
 import cn.wkiki.kql.es.IndexField;
 import cn.wkiki.kql.exception.DSLSemanticsException;
 import cn.wkiki.kql.exception.DSLSyntaxException;
+import cn.wkiki.kql.exception.LimitSizeFormatException;
+import cn.wkiki.kql.model.DetailQueryParamBody;
 import cn.wkiki.kql.queryUnit.*;
+import cn.wkiki.kql.util.GsonUtil;
+import com.google.gson.reflect.TypeToken;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +42,14 @@ public abstract class TreeNode {
 
     public QueryUnit toTranslateUnit(TranslateContext translateContext){
         throw new UnsupportedOperationException("类型"+this.getClass()+"不支持此方法！！！");
+    }
+
+    public DetailQueryParamBody toQueryParamBody(TranslateContext translateContext){
+        QueryUnit queryUnit = this.toTranslateUnit(translateContext);
+        Map<String,Object> queryField = GsonUtil.getInstance().fromJson(queryUnit.toESQueryJsonEntity(),new TypeToken<HashMap<String,Object>>(){}.getType());
+        DetailQueryParamBody detailQueryParamBody = new DetailQueryParamBody();
+        detailQueryParamBody.setQuery(queryField);
+        return detailQueryParamBody;
     }
 
     /**
@@ -323,6 +333,11 @@ public abstract class TreeNode {
         @Override
         public QueryUnit toTranslateUnit(TranslateContext translateContext) {
             return innerNode.toTranslateUnit(translateContext);
+        }
+
+        @Override
+        public DetailQueryParamBody toQueryParamBody(TranslateContext translateContext) {
+            return innerNode.toQueryParamBody(translateContext);
         }
     }
 
@@ -720,6 +735,52 @@ public abstract class TreeNode {
         public QueryUnit toTranslateUnit(TranslateContext translateContext) {
             return this.filterTree.toTranslateUnit(translateContext);
         }
+
+        @Override
+        public DetailQueryParamBody toQueryParamBody(TranslateContext translateContext) {
+            DetailQueryParamBody result = filterTree.toQueryParamBody(translateContext);
+            Token aggFunctionToken = this.getAggregationFunctionToken();
+            String aggFieldName  = this.getLiteralValueTreeNode().getLiteralValueToken().getValue();
+            if(translateContext!=null && translateContext.getFields().stream().noneMatch(t->t.getName().equals(aggFieldName))){
+                String errMsg =String.format("要聚合的字段[%s]不在索引的属性列表中", aggFieldName);
+                throw new DSLSemanticsException(errMsg);
+            }
+            if(result.getAggs() == null){
+                result.setAggs(new HashMap<>());
+            }
+            String aggName ="";
+            Map<String,Map<String,String>> aggBody = new HashMap();
+            switch (aggFunctionToken.getType()){
+                case avg:
+                    aggName ="avg";
+                    break;
+                case stat:
+                    aggName ="stats";
+                case max:
+                    aggName ="max";
+                    break;
+                case min:
+                    aggName ="min";
+                    break;
+                case sum:
+                    aggName ="sum";
+                    break;
+                case count:
+                    aggName ="value_count";
+                    break;
+                case terms:
+                    aggName="terms";
+                    break;
+                default:
+                    throw new DSLSemanticsException("未知的聚合类型:"+aggFunctionToken.getValue());
+
+            }
+            HashMap<String,String> aggsConfigMap = new HashMap<>();
+            aggsConfigMap.put("field",aggFieldName);
+            aggBody.put(aggName, aggsConfigMap);
+            result.getAggs().put(aggName, aggBody);
+            return result;
+        }
     }
 
     /**
@@ -743,4 +804,60 @@ public abstract class TreeNode {
         }
     }
 
+    public static class LimitResultTreeNode extends TreeNode implements LimitResultStatement{
+        TreeNode searchStatement;
+
+        Token limitToken;
+
+        Token limitValueToken;
+
+        int limitSize = 0;
+        @Override
+        public void setSearchStatement(TreeNode searchStatement) {
+            if(searchStatement !=null){
+                this.searchStatement = searchStatement;
+            }
+        }
+
+        @Override
+        public void setLimitToken(Token limitToken) {
+            if(limitToken != null&& limitToken.getType().equals(Token.Type.limit)){
+                this.limitToken = limitToken;
+            }else{
+                throw new DSLSemanticsException("limit token 不可为null且仅能为 limit");
+            }
+        }
+
+        @Override
+        public void setLimitValueToken(Token limitValueToken) throws LimitSizeFormatException {
+            if(limitValueToken !=null){
+                if(limitValueToken.getType().equals(Token.Type.identifier)
+                    ||limitValueToken.getType().equals(Token.Type.literalValue)){
+                    this.limitValueToken = limitValueToken;
+                    this.limitSize = Integer.parseInt(limitValueToken.getValue());
+                }else{
+                    throw new DSLSemanticsException("limit value token 的token类型仅可为 identifier 或 literalValue");
+                }
+            }else {
+                throw new DSLSemanticsException("limit value token 不可为null");
+            }
+        }
+
+        @Override
+        public String toSourceStr() {
+            return searchStatement.toSourceStr()+" "+limitToken.getValue()+" "+limitValueToken.getValue();
+        }
+
+        @Override
+        public QueryUnit toTranslateUnit(TranslateContext translateContext) {
+            return this.searchStatement.toTranslateUnit(translateContext);
+        }
+
+        @Override
+        public DetailQueryParamBody toQueryParamBody(TranslateContext translateContext) {
+            DetailQueryParamBody result = super.toQueryParamBody(translateContext);
+            result.setSize(this.limitSize);
+            return result;
+        }
+    }
 }

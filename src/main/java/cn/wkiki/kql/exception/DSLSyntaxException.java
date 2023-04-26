@@ -45,4 +45,9 @@ public class DSLSyntaxException extends RuntimeException{
         }
         return stringBuilder.toString();
     }
+
+    @Override
+    public String getMessage(){
+        return this.errMsg;
+    }
 }

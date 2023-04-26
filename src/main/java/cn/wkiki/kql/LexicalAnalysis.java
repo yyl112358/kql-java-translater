@@ -281,6 +281,9 @@ public class LexicalAnalysis {
                     putTkBufChar(character);
             }
         }
+        // todo 由于dsl产生式自身的关系(如何认识最后一个关键字token)，若statement 中最后一个statement是matchtext类型的查询时
+        //  因为无法判断match text的边界，若最后一个token后无空字符，则目前lexical 无法识别出最后一个key word
+        //  类似  a:b and | a:b and c:or中 最后的一个and 和 or 无法识别为关键字  ！！！！！！
         Token result = new Token();
         result.setStartIndex(startIndex);
         result.setValue(tokenBuffAsString().trim());// 移除前后两侧无用的空格

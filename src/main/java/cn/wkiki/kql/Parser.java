@@ -71,6 +71,8 @@ public class Parser {
                 throw new DSLSyntaxException(startToken, source, "引号(\")前只能是null或逻辑运算子树");
             case group:
                 return processAggregationTree(perTreeNode, startToken);
+            case limit:
+                return processLimitResultTree(perTreeNode,startToken);
             default:
                 String syntaxErrMsg="";
                 if(perTreeNode== null){
@@ -214,7 +216,7 @@ public class Parser {
         TreeNode.FieldNameTreeNode fieldNameTreeNode = new TreeNode.FieldNameTreeNode(identifierToken);
         result.setFieldNameTreeNode(fieldNameTreeNode);
         lexicalAnalysis.nextToken();
-        TreeNode bracketTreeNode = processBracketTree(true,lexicalAnalysis.token());
+        TreeNode bracketTreeNode = processBracketTree(false,lexicalAnalysis.token());
         if(bracketTreeNode.getClass().equals(TreeNode.BracketTreeNode.class)){
             //validate 借一个queue校验括号内是否是只有字面量与逻辑运算子树
             LinkedList<TreeNode> linkedList = new LinkedList();
@@ -288,7 +290,7 @@ public class Parser {
         result.setLbracketToken(lbracketToken);
         Token perReadToken = lexicalAnalysis.perReadToken();
         if(perReadToken == null){
-            throw new DSLSyntaxException(lbracketToken, source, "左括号(右侧不能为空！！");
+            throw new DSLSyntaxException(lbracketToken, source, "未找到左括号(对应的右括号");
         }else if(perReadToken.getType().equals(Token.Type.rbracket)){
             // 空括号
             lexicalAnalysis.nextToken();
@@ -302,14 +304,7 @@ public class Parser {
             if(perReadToken == null){
                 throw new DSLSyntaxException(lbracketToken, source, "未找到左括号(对应的右括号");
             }
-            while (perReadToken!=null && perReadToken.getType().equals(Token.Type.and)||perReadToken.getType().equals(Token.Type.or)||perReadToken.getType().equals(Token.Type.rbracket)){
-                // 括号内有逻辑子树的其他部分
-                if(perReadToken.getType().equals(Token.Type.and)||perReadToken.getType().equals(Token.Type.or)){
-                    lexicalAnalysis.nextToken();
-                    innerTreeNode = processLogicCalcTree(innerTreeNode,lexicalAnalysis.token());
-                    perReadToken = lexicalAnalysis.perReadToken();
-                    continue;
-                }
+            while (perReadToken!=null){
                 if(perReadToken.getType().equals(Token.Type.rbracket)){
                     result.setInnerStatement(innerTreeNode);
                     lexicalAnalysis.nextToken();
@@ -325,7 +320,14 @@ public class Parser {
                         }
                     }
                     break;
-                }else{
+                } else{
+                    // 括号内有逻辑子树的其他部分
+                    lexicalAnalysis.nextToken();
+                    innerTreeNode = getSubTreeNode(false,innerTreeNode,lexicalAnalysis.token());
+                    perReadToken = lexicalAnalysis.perReadToken();
+                    if(perReadToken!=null){
+                        continue;
+                    }
                     String errMsg = String.format( "左括号期望对应位置的右括号实际为[type:%s,value:%s]",
                             perReadToken.getType().name(),
                             perReadToken.getValue());
@@ -429,6 +431,34 @@ public class Parser {
             throw new DSLSemanticsException(errMsg);
         }
         return aggregationTreeNode;
+    }
+
+    /**
+     * 处理一个限制查询结果集数量子树
+     * @param searchStatement 限制条件前的查询表达式树
+     * @param limitToken limit token
+     * @return
+     */
+    private TreeNode.LimitResultTreeNode processLimitResultTree(TreeNode searchStatement,Token limitToken){
+        TreeNode.LimitResultTreeNode result = new TreeNode.LimitResultTreeNode();
+        if(searchStatement == null){
+            throw new DSLSemanticsException("limit 表达式前必须有查询条件");
+        }
+        result.setSearchStatement(searchStatement);
+        result.setLimitToken(limitToken);
+        acceptNextToken(limitToken,Arrays.asList(Token.Type.identifier,Token.Type.literalValue), "limit 关键字后需要的类型为 identifier或literalValue");
+        lexicalAnalysis.nextToken();
+        Token limitValueToken = lexicalAnalysis.token();
+        try{
+            int limitValue = Integer.parseInt(limitValueToken.getValue());
+            if(limitValue<=0){
+                throw new DSLSyntaxException(limitValueToken,source, "limit 限制的期望值应为一个合法的大于0的int类型的值,当前值为:"+limitValue);
+            }
+            result.setLimitValueToken(limitValueToken);
+        }catch (NumberFormatException e){
+            throw new DSLSyntaxException(limitValueToken,source, "limit 限制的期望值应为一个合法的大于0的int类型的值");
+        }
+        return result;
     }
 
     /**

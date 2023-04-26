@@ -36,7 +36,7 @@ public class Token {
 
     @Override
     public String toString() {
-        return "[value:"+getValue()+",startIndex:"+startIndex+",tokenType:"+type.name();
+        return "[value:"+getValue()+",startIndex:"+startIndex+",tokenType:"+type.name()+"]";
     }
 
     /**
@@ -62,6 +62,7 @@ public class Token {
         // aggregation
         group("group"),
         by("by"),
+        limit("limit"),
         // aggregation function
         avg("avg()"),
         stat("stat()"),
