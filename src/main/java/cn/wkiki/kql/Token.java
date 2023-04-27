@@ -63,6 +63,7 @@ public class Token {
         group("group"),
         by("by"),
         limit("limit"),
+        order("order"),
         // aggregation function
         avg("avg()"),
         stat("stat()"),
@@ -77,7 +78,7 @@ public class Token {
         /**
          * 标示符为语言保留字时的值
          */
-        String value;
+        final String value;
 
         /**
          * 关键字的最大文本长度
@@ -94,8 +95,8 @@ public class Token {
 
         /**
          * 判断给定的字符是否匹配到关键字
-         * @param ch
-         * @return
+         * @param ch 要判断的字符
+         * @return 字符对应的关键字类型 或 null(字符不是关键字)
          */
         public static Type isLangKeyWord(char ch){
             Type result = null;
@@ -110,8 +111,8 @@ public class Token {
 
         /**
          * 判断规定的字符串是否匹配到关键字
-         * @param str
-         * @return
+         * @param str 要判断的字符串
+         * @return 字符串对应的关键字类型 或 null(字符串不是关键字)
          */
         public static Type isLangKeyWord(String str){
             if(str.length() == 1){

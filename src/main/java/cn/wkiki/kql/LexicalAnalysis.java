@@ -17,11 +17,13 @@ public class LexicalAnalysis {
      */
     char[] source;
 
-    static final int TokenBufferSize = 256;
+    int tokenBufferSize = 256;
+
+    int maxTokenSize = 2048;
     /**
      * 生成token时的buffer
      */
-    char[] tokenBuf =new char[TokenBufferSize];
+    char[] tokenBuf =new char[tokenBufferSize];
 
     Token currentToken;
 
@@ -41,14 +43,13 @@ public class LexicalAnalysis {
 
     /**
      * 消费下一个token，调用此方法后。pervToken将被当前token替代
-     * @return
      */
     public void nextToken(){
         tp = 0;
         pervToken = currentToken;
         currentToken = null;
         loop: while (true){
-            Character ch = getChar();
+            Character ch = getChar(),nextChar;
             if(ch !=null){
                 switch (ch){
                     case ' ':
@@ -71,7 +72,7 @@ public class LexicalAnalysis {
                         currentToken = processSingleCharKey(ch);
                         break loop;
                     case '\\':
-                        Character nextChar = getChar();
+                        nextChar = getChar();
                         // 只有\ 后续跟着"或\时才处理为strEscape token 否则当作字面量处理
                         if(nextChar !=null && (nextChar == '\"'||nextChar == '\\')){
                             spitChar(1);
@@ -102,7 +103,7 @@ public class LexicalAnalysis {
 
     /**
      * 获取当前的token
-     * @return
+     * @return lexical 当前正在处理的token
      */
     public Token token(){
         return currentToken;
@@ -110,7 +111,7 @@ public class LexicalAnalysis {
 
     /**
      * 获取上一个token
-     * @return
+     * @return lexical 处理的上一个token
      */
     public Token pervToken(){
         return pervToken;
@@ -118,7 +119,7 @@ public class LexicalAnalysis {
 
     /**
      * 消费一个字符,并移动当前的sourcePosition位置
-     * @return
+     * @return 当前正消费的字符
      */
     private Character getChar(){
         if(sp<source.length){
@@ -130,7 +131,7 @@ public class LexicalAnalysis {
     /**
      * 消费一个相对于当前位置的字符，但不移动当前的sourcePosition
      * @param relatePosition 消费一个相对当前位置的位置值 (大于0是向后消费；小于0时向前消费，但绝对值不能小于当前所在的位置)
-     * @return
+     * @return 当前正消费的字符
      */
     private Character perReadChar(int relatePosition){
         if(relatePosition >0){
@@ -157,8 +158,8 @@ public class LexicalAnalysis {
 
     /**
      * 处理单字符关键字
-     * @param ch
-     * @return
+     * @param ch 判断为关键字的 单个字符
+     * @return 单个关键字的token token类型为字符对应的关键字
      */
     private Token processSingleCharKey(char ch){
         currentToken = new Token();
@@ -174,12 +175,13 @@ public class LexicalAnalysis {
     }
 
     /**
-     * 处理两个字符的关键字
-     * @param ch
-     * @return
+     * 处理两个字符的关键字，注意此时，lexical 应该仅消费到了关键字对应的第一个字符。<br/>
+     * in other word lexical的下一个要消费的字符应该是双字符关键字的第二个字符。
+     * @param ch 两个字符关键字的第一个字符。
+     * @return 两个字符的关键字类型Token
      */
     private Token processTwoCharKey(char ch){
-        char secondChar = getChar();
+        Character secondChar = getChar();
         currentToken = new Token();
         currentToken.setStartIndex(sp);
         currentToken.setValue(String.valueOf(new char[]{ch,secondChar}));
@@ -194,13 +196,13 @@ public class LexicalAnalysis {
 
     /**
      * 处理标示符 与 字面量
-     * @param firstCh
-     * @return
+     * @param firstCh 标示符或字面量的第一个字符
+     * @return 一个标示符或字面量Token
      */
     private Token processIdentifier(char firstCh,int startIndex){
         putTkBufChar(firstCh);
         loop: while (true) {
-            Character character = getChar();
+            Character character = getChar(),nextChar;
             if(character == null){
                 break ;
             }
@@ -255,7 +257,7 @@ public class LexicalAnalysis {
                     spitChar(1);
                     break loop;
                 case '\\':
-                    Character nextChar = getChar();
+                    nextChar = getChar();
                     // 只有\ 后续跟着"或\时才处理为strEscape token 否则当作字面量处理
                     if(nextChar !=null && (nextChar == '\"'||nextChar == '\\')){
                         spitChar(2);
@@ -310,20 +312,34 @@ public class LexicalAnalysis {
 
     /**
      * 将一个字符追到到tokenBuffer中
-     * @param ch
+     * @param ch 要追加的字符
      */
     private void putTkBufChar(char ch){
-        if(tp<TokenBufferSize){
+        ensureTkBuffSize();
+        if(tp< tokenBufferSize - 1){
             tokenBuf[tp++] = ch;
         }else{
-            String errMsg = String.format("单个token最大长度允许为[%d],当前token[%s]已达到最大长度，无法读取下一个字符！！！",TokenBufferSize, tokenBuffAsString());
+            String errMsg = String.format("单个token最大长度允许为[%d],当前token[%s]已达到最大长度，无法读取下一个字符！！！", tokenBufferSize, tokenBuffAsString());
             throw new RuntimeException(errMsg);
+        }
+    }
+
+    private void ensureTkBuffSize(){
+        if(tp == tokenBufferSize - 1){
+            //full
+            int newSize = new Float(tokenBufferSize * 1.5).intValue();
+            newSize = Math.min(newSize, maxTokenSize);
+            char[] newTokenBuff = Arrays.copyOf(tokenBuf, newSize);
+            synchronized (this){
+                tokenBuf = newTokenBuff;
+                tokenBufferSize = newSize;
+            }
         }
     }
 
     /**
      * 读取token buffer中的字符，返回新的字符串引用
-     * @return
+     * @return token buffer中存放本次读取token的 字符串 或 null(当前token扫描未在buffer中存放任何字符)
      */
     private String tokenBuffAsString(){
         if(tp>0){
