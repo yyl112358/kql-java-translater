@@ -3,9 +3,11 @@ package cn.wkiki.kql;
 
 import cn.wkiki.kql.exception.CharacterOutOfRangeException;
 import cn.wkiki.kql.exception.NoMatchTokenTypeException;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * 词法分析器
@@ -213,33 +215,21 @@ public class LexicalAnalysis {
                     // 语言中字符串常量可以 不以"或'包裹 意味着关键字与字符串常量之间仅有空格隔断，扫描过程中需要判断读进来的连续非空格的字符串是否为关键字
                     // 此标记用来标记每碰到一个空格或类似字符时，前面已读的部分是否有空格出现。如果有空格且最后一个连续的非空格字符串为关键字
                     // 则需要吐出已消费的对应的长度后，将前面部分收集为字符串常量。关键字token部分则留给下一次消费
-                    boolean matchLastWhiteChar = false;
-                    char[] lastIdentifierPart = null;
-                    for (int i = tp-1;i>=0;i--){
-                        if (tokenBuf[i] == ' '||tokenBuf[i]=='\t'||tokenBuf[i]=='\f'){
-                            matchLastWhiteChar = true;
-                            lastIdentifierPart = Arrays.copyOfRange(tokenBuf, i+1, tp);
-                            break;
-                        }
-                    }
-                    if(lastIdentifierPart == null){
-                        lastIdentifierPart = Arrays.copyOf(tokenBuf, tp);
-                    }
-                    Token.Type lastPartMatchedKey = Token.Type.isLangKeyWord(String.valueOf(lastIdentifierPart));
-                    if(lastPartMatchedKey !=null){
-                        // 最后一段字符可以匹配关键字
-                        if(!matchLastWhiteChar){
+                    // 简而言之 -> 在扫描 identifier时 每个 空格都要停下来检视是否有关键字被消费了
+                    Optional<KeyInIdentifierResult> matchKeyWord= matchKeywordInIdentifier();
+                    if(matchKeyWord.isPresent()){ // 最后一段字符可以匹配关键字
+                        if(matchKeyWord.get().isMatchedAllText()){
                             // 当前所有字符既是关键字
                             Token result = new Token();
                             result.setValue(tokenBuffAsString());
                             resetTkBuff();
-                            result.setType(lastPartMatchedKey);
+                            result.setType(matchKeyWord.get().getMatchKeyType());
                             result.setStartIndex(startIndex);
                             return result;
                         }else{
                             //最后一段关键字前有其他字符串，修改sp吐出对应长度的字符后修改tp位置，退出循环
-                            spitChar(lastPartMatchedKey.value.length()+1);
-                            tp-=lastPartMatchedKey.value.length();
+                            spitChar(matchKeyWord.get().getMatchKeyType().value.length()+1);
+                            tp-=matchKeyWord.get().getMatchKeyType().value.length();
                             break loop;
                         }
                     }else {
@@ -283,31 +273,87 @@ public class LexicalAnalysis {
                     putTkBufChar(character);
             }
         }
-        // todo 由于dsl产生式自身的关系(如何认识最后一个关键字token)，若statement 中最后一个statement是matchtext类型的查询时
-        //  因为无法判断match text的边界，若最后一个token后无空字符，则目前lexical 无法识别出最后一个key word
-        //  类似  a:b and | a:b and c:or中 最后的一个and 和 or 无法识别为关键字  ！！！！！！
-        Token result = new Token();
+        // 将 identifier 中最后一个可能为关键字的串 识别为关键字
+        // 类似  a:b and | a:b and c:or中 最后的一个and 和 or 识别为关键字而非字面量 ！！！！！！
+        Optional<KeyInIdentifierResult> matchKeyWord= matchKeywordInIdentifier();
+        Token result =null;
+        if(matchKeyWord.isPresent()){ // 最后一段字符可以匹配关键字
+            if(matchKeyWord.get().isMatchedAllText()){
+                // 当前所有字符既是关键字
+                result = new Token();
+                result.setValue(tokenBuffAsString());
+                resetTkBuff();
+                result.setType(matchKeyWord.get().getMatchKeyType());
+                result.setStartIndex(startIndex);
+                return result;
+            }else{
+                //最后一段关键字前有其他字符串，修改sp吐出对应长度的字符后修改tp位置，退出循环
+                spitChar(matchKeyWord.get().getMatchKeyType().value.length()+1);
+                tp-=matchKeyWord.get().getMatchKeyType().value.length();
+            }
+        }
+        result = new Token();
         result.setStartIndex(startIndex);
         result.setValue(tokenBuffAsString().trim());// 移除前后两侧无用的空格
         resetTkBuff();
-        Token.Type keyWordType = Token.Type.isLangKeyWord(result.getValue());
-        if(keyWordType!=null){
-            result.setType(keyWordType);
-        }else{
-            result.setType(Token.Type.identifier);
-            Token pervToken = pervToken();
-            if(pervToken !=null && (pervToken.getType() == Token.Type.colon
-                    || pervToken.getType() == Token.Type.quotes
-                    || pervToken.getType() == Token.Type.lt
-                    || pervToken.getType() == Token.Type.gt
-                    || pervToken.getType() == Token.Type.lte
-                    || pervToken.getType() == Token.Type.gte)){
-                // 上述几种情况提前加工为字面量，但不说明不符合上面情况下此标示符不是字面量
-                result.setType(Token.Type.literalValue);
-                result.setValue(result.getValue().trim()); // 移除前后两侧无用的空格
-            }
+        result.setType(Token.Type.identifier);
+        Token pervToken = pervToken();
+        if(pervToken !=null && (pervToken.getType() == Token.Type.colon
+                || pervToken.getType() == Token.Type.quotes
+                || pervToken.getType() == Token.Type.lt
+                || pervToken.getType() == Token.Type.gt
+                || pervToken.getType() == Token.Type.lte
+                || pervToken.getType() == Token.Type.gte)){
+            // 上述几种情况提前加工为字面量，但不说明不符合上面情况下此标示符不是字面量
+            result.setType(Token.Type.literalValue);
+            result.setValue(result.getValue().trim()); // 移除前后两侧无用的空格
         }
         return result;
+    }
+
+    /**
+     * 尝试从当前的tokenBuffer匹配最后的部分是否为一个关键字
+     * @return 匹配到Keyword 类型的Type及标记buffer中是否均为keyword 或 null（当前 token buffer中的所有内容均为 identifier）
+     */
+    private Optional<KeyInIdentifierResult> matchKeywordInIdentifier(){
+        boolean matchLastWhiteChar = false;
+        char[] lastIdentifierPart = null;
+        for (int i = tp-1;i>=0;i--){
+            if (tokenBuf[i] == ' '||tokenBuf[i]=='\t'||tokenBuf[i]=='\f'){
+                matchLastWhiteChar = true;
+                lastIdentifierPart = Arrays.copyOfRange(tokenBuf, i+1, tp);
+                break;
+            }
+        }
+        if(lastIdentifierPart == null){
+            lastIdentifierPart = Arrays.copyOf(tokenBuf, tp);
+        }
+        Token.Type lastPartMatchedKey = Token.Type.isLangKeyWord(String.valueOf(lastIdentifierPart));
+        KeyInIdentifierResult result = null;
+        if(lastPartMatchedKey!=null){
+            if(!matchLastWhiteChar){
+                result = new KeyInIdentifierResult(lastPartMatchedKey,true);
+            }else{
+                result = new KeyInIdentifierResult(lastPartMatchedKey,false);
+            }
+        }
+        return Optional.ofNullable(result);
+    }
+
+    /**
+     * 尝试从 identifier 匹配Keyword时的结果
+     */
+    @Getter
+    private class KeyInIdentifierResult{
+
+        protected KeyInIdentifierResult(Token.Type matchKeyType,boolean matchedAllText){
+            this.matchKeyType = matchKeyType;
+            this.matchedAllText = matchedAllText;
+        }
+
+        Token.Type matchKeyType;
+
+        boolean matchedAllText;
     }
 
     /**
@@ -339,14 +385,14 @@ public class LexicalAnalysis {
 
     /**
      * 读取token buffer中的字符，返回新的字符串引用
-     * @return token buffer中存放本次读取token的 字符串 或 null(当前token扫描未在buffer中存放任何字符)
+     * @return token buffer中存放本次读取token的 字符串 或 空字符(当前token扫描未在buffer中存放任何字符)
      */
     private String tokenBuffAsString(){
         if(tp>0){
             char[] chars = Arrays.copyOf(tokenBuf,tp);
             return String.valueOf(chars);
         }
-        return null;
+        return "";
     }
 
     /**

@@ -4,6 +4,7 @@ import cn.wkiki.kql.exception.DSLExpectTokenNotExistException;
 import cn.wkiki.kql.exception.DSLSemanticsException;
 import cn.wkiki.kql.exception.DSLSyntaxException;
 import cn.wkiki.kql.tree.TreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.*;
 import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.Arrays;
@@ -49,8 +50,8 @@ public class Parser {
             case identifier:
                 return processTextMatchOrPhraseMatchOrRelation(startToken);
             case literalValue:
-                if(perTreeNode == null || perTreeNode.getClass().equals(TreeNode.LogicCalcTreeNode.class)
-                || perTreeNode.getClass().equals(TreeNode.BracketTreeNode.class)){
+                if(perTreeNode == null || perTreeNode.getClass().equals(LogicCalcTreeNode.class)
+                || perTreeNode.getClass().equals(BracketTreeNode.class)){
                     return processMultiField(startToken);
                 }
                 throw new DSLSyntaxException(startToken, source, "多字段匹配查询前只能是 空、逻辑运算子树或括号运算树");
@@ -59,13 +60,13 @@ public class Parser {
             case not:
                 return processLogicCalcTree(perTreeNode,startToken);
             case lbracket:
-                if(perTreeNode == null || perTreeNode.getClass().equals(TreeNode.LogicCalcTreeNode.class)
-                ||perTreeNode.getClass().equals(TreeNode.BracketTreeNode.class)){
+                if(perTreeNode == null || perTreeNode.getClass().equals(LogicCalcTreeNode.class)
+                ||perTreeNode.getClass().equals(BracketTreeNode.class)){
                     return processBracketTree(bracketGreedMatchLogicToken,startToken);
                 }
                 throw new DSLSyntaxException(startToken, source, "括号前只能是 空、逻辑运算子树或括号运算符");
             case quotes:
-                if(perTreeNode == null || perTreeNode.getClass().equals(TreeNode.LogicCalcTreeNode.class)){
+                if(perTreeNode == null || perTreeNode.getClass().equals(LogicCalcTreeNode.class)){
                     return collectPhraseLiteralValue(startToken);
                 }
                 throw new DSLSyntaxException(startToken, source, "引号(\")前只能是null或逻辑运算子树");
@@ -73,6 +74,8 @@ public class Parser {
                 return processAggregationTree(perTreeNode, startToken);
             case limit:
                 return processLimitResultTree(perTreeNode,startToken);
+            case order:
+                return processOrderResultTree(perTreeNode, startToken);
             default:
                 String syntaxErrMsg="";
                 if(perTreeNode== null){
@@ -95,7 +98,7 @@ public class Parser {
      * @param quoteToken
      * @return
      */
-    private TreeNode.PhraseLiteralValueTreeNode collectPhraseLiteralValue(Token quoteToken){
+    private PhraseLiteralValueTreeNode collectPhraseLiteralValue(Token quoteToken){
         lexicalAnalysis.nextToken();
         Token nextToken =null;
         Token perToken  = null;
@@ -128,7 +131,7 @@ public class Parser {
                 }
                 phraseLiteralValue = stringBuilder.toString();
             }
-            TreeNode.PhraseLiteralValueTreeNode result = new TreeNode.PhraseLiteralValueTreeNode(phraseLiteralValue);
+            PhraseLiteralValueTreeNode result = new PhraseLiteralValueTreeNode(phraseLiteralValue);
             return result;
         }
     }
@@ -175,15 +178,15 @@ public class Parser {
      * 处理一个全文查询的子树
      * @param identifierToken 属性标记符token
      * @param colonToken 查询冒号token
-     * @return
+     * @return 一个全文查询子树
      */
-    private TreeNode.TextMatchTreeNode processTextMatchTree(Token identifierToken, Token colonToken){
-        TreeNode.TextMatchTreeNode result = new TreeNode.TextMatchTreeNode();
-        TreeNode.FieldNameTreeNode fieldNameTreeNode = new TreeNode.FieldNameTreeNode(identifierToken);
+    private TextMatchTreeNode processTextMatchTree(Token identifierToken, Token colonToken){
+        TextMatchTreeNode result = new TextMatchTreeNode();
+        FieldNameTreeNode fieldNameTreeNode = new FieldNameTreeNode(identifierToken);
         result.setFieldNameTreeNode(fieldNameTreeNode);
         lexicalAnalysis.nextToken();
         Token literalToken = lexicalAnalysis.token();
-        TreeNode.LiteralValueTreeNode literalValueTreeNode = new TreeNode.LiteralValueTreeNode(literalToken);
+        LiteralValueTreeNode literalValueTreeNode = new LiteralValueTreeNode(literalToken);
         result.setLiteralValueTreeNode(literalValueTreeNode);
         return result;
     }
@@ -192,55 +195,55 @@ public class Parser {
      * 处理一个短语查询的子树
      * @param identifierToken 属性标记符token
      * @param colonToken 查询冒号token
-     * @return
+     * @return 一个短语查询子树
      */
-    private TreeNode.MatchPhraseTreeNode processMatchPhraseTree(Token identifierToken, Token colonToken){
-        TreeNode.MatchPhraseTreeNode result = new TreeNode.MatchPhraseTreeNode();
-        TreeNode.FieldNameTreeNode fieldNameTreeNode = new TreeNode.FieldNameTreeNode(identifierToken);
+    private MatchPhraseTreeNode processMatchPhraseTree(Token identifierToken, Token colonToken){
+        MatchPhraseTreeNode result = new MatchPhraseTreeNode();
+        FieldNameTreeNode fieldNameTreeNode = new FieldNameTreeNode(identifierToken);
         result.setFieldNameTreeNode(fieldNameTreeNode);
         lexicalAnalysis.nextToken();
         Token quoteToken = lexicalAnalysis.token();
-        TreeNode.PhraseLiteralValueTreeNode phraseLiteralValueTreeNode = collectPhraseLiteralValue(quoteToken);
+        PhraseLiteralValueTreeNode phraseLiteralValueTreeNode = collectPhraseLiteralValue(quoteToken);
         result.setPhaseLiteralValueTreeNode(phraseLiteralValueTreeNode);
         return result;
     }
 
     /**
      * 处理一个带括号语句的属性查询
-     * @param identifierToken
-     * @param colonToken
-     * @return
+     * @param identifierToken 带括号语句的字面量token (也就是FieldName)
+     * @param colonToken 字面量后面紧跟的 冒号Token
+     * @return 一个带括号的属性查询
      */
     private TreeNode processMatchWithBracketTree(Token identifierToken, Token colonToken){
-        TreeNode.MatchWithBracketTreeNode result = new TreeNode.MatchWithBracketTreeNode();
-        TreeNode.FieldNameTreeNode fieldNameTreeNode = new TreeNode.FieldNameTreeNode(identifierToken);
+        MatchWithBracketTreeNode result = new MatchWithBracketTreeNode();
+        FieldNameTreeNode fieldNameTreeNode = new FieldNameTreeNode(identifierToken);
         result.setFieldNameTreeNode(fieldNameTreeNode);
         lexicalAnalysis.nextToken();
         TreeNode bracketTreeNode = processBracketTree(false,lexicalAnalysis.token());
-        if(bracketTreeNode.getClass().equals(TreeNode.BracketTreeNode.class)){
+        if(bracketTreeNode.getClass().equals(BracketTreeNode.class)){
             //validate 借一个queue校验括号内是否是只有字面量与逻辑运算子树
             LinkedList<TreeNode> linkedList = new LinkedList();
-            linkedList.addLast(((TreeNode.BracketTreeNode) bracketTreeNode).getInnerNode());
+            linkedList.addLast(((BracketTreeNode) bracketTreeNode).getInnerNode());
             TreeNode treeNode = null;
             while ((treeNode = linkedList.pollFirst())!=null){
-                if (treeNode.getClass().equals(TreeNode.BracketTreeNode.class)){
-                    treeNode = ((TreeNode.BracketTreeNode) treeNode).getInnerNode();
+                if (treeNode.getClass().equals(BracketTreeNode.class)){
+                    treeNode = ((BracketTreeNode) treeNode).getInnerNode();
                 }
-                if(treeNode.getClass().equals(TreeNode.LogicCalcTreeNode.class)){
-                    if(!((TreeNode.LogicCalcTreeNode) treeNode).getLogicCalcToken().getType().equals(Token.Type.not)){
-                        linkedList.addLast(((TreeNode.LogicCalcTreeNode) treeNode).getLeftSubNode().getSubTreeNode());
+                if(treeNode.getClass().equals(LogicCalcTreeNode.class)){
+                    if(!((LogicCalcTreeNode) treeNode).getLogicCalcToken().getType().equals(Token.Type.not)){
+                        linkedList.addLast(((LogicCalcTreeNode) treeNode).getLeftSubNode().getSubTreeNode());
                     }
-                    linkedList.addLast(((TreeNode.LogicCalcTreeNode) treeNode).getRightSubNode().getSubTreeNode());
+                    linkedList.addLast(((LogicCalcTreeNode) treeNode).getRightSubNode().getSubTreeNode());
                 }
-                else if(!treeNode.getClass().equals(TreeNode.LiteralValueTreeNode.class)&&
-                !treeNode.getClass().equals(TreeNode.PhraseLiteralValueTreeNode.class)&&
-                        !treeNode.getClass().equals(TreeNode.MultiFieldMatchTreeNode.class)){
+                else if(!treeNode.getClass().equals(LiteralValueTreeNode.class)&&
+                !treeNode.getClass().equals(PhraseLiteralValueTreeNode.class)&&
+                        !treeNode.getClass().equals(MultiFieldMatchTreeNode.class)){
                     String errMsg = String.format("带括号语句的属性查询子树，括号内只能是逻辑运算符与字面量，子树[%s]不符合！",
                             treeNode.toSourceStr());
                     throw new DSLSyntaxException(identifierToken,source,errMsg);
                 }
             }
-            result.setBracketTreeNode((TreeNode.BracketTreeNode)bracketTreeNode);
+            result.setBracketTreeNode((BracketTreeNode)bracketTreeNode);
         }else{
             String errMsg = String.format("属性token右侧期望一个()表达式，实际返回了一个[%s]", result.getClass().getSimpleName());
             throw new DSLSyntaxException(identifierToken, source, errMsg);
@@ -250,24 +253,24 @@ public class Parser {
 
     /**
      * 处理一个关系查询的子树
-     * @param identifierToken
-     * @param relationCalcToken
-     * @return
+     * @param identifierToken 字面量token (也就是FieldName)
+     * @param relationCalcToken 关系运算符token
+     * @return 一个关系查询子树
      */
     private TreeNode processRelationCalcTree(Token identifierToken, Token relationCalcToken){
-        TreeNode.RelationCalcTreeNode result = new TreeNode.RelationCalcTreeNode();
-        TreeNode.FieldNameTreeNode fieldNameTreeNode = new TreeNode.FieldNameTreeNode(identifierToken);
+        RelationCalcTreeNode result = new RelationCalcTreeNode();
+        FieldNameTreeNode fieldNameTreeNode = new FieldNameTreeNode(identifierToken);
         result.setFieldNameTreeNode(fieldNameTreeNode);
         result.setRelationCalcToken(relationCalcToken);
         Token perReadToken = lexicalAnalysis.perReadToken();
         if(perReadToken !=null){
             if(perReadToken.getType().equals(Token.Type.literalValue)){
                 lexicalAnalysis.nextToken();
-                TreeNode.LiteralValueTreeNode literalValueTreeNode = new TreeNode.LiteralValueTreeNode(lexicalAnalysis.token());
+                LiteralValueTreeNode literalValueTreeNode = new LiteralValueTreeNode(lexicalAnalysis.token());
                 result.setLiteralValueTreeNode(literalValueTreeNode);
             }else if(perReadToken.getType().equals(Token.Type.quotes)){
                 lexicalAnalysis.nextToken();
-                TreeNode.PhraseLiteralValueTreeNode phraseLiteralValueTreeNode = collectPhraseLiteralValue(lexicalAnalysis.token());
+                PhraseLiteralValueTreeNode phraseLiteralValueTreeNode = collectPhraseLiteralValue(lexicalAnalysis.token());
                 result.setPhraseLiteralValueTreeNode(phraseLiteralValueTreeNode);
             }else{
                 throw new DSLSyntaxException(relationCalcToken, source, "关系运算符后只能是字面量或\"");
@@ -283,10 +286,10 @@ public class Parser {
      * 处理一个优先级改变语句子树(括号语句)
      * @param greedLogicToken 匹配完成后是否向后贪婪匹配一个逻辑运算符(and,not)
      * @param lbracketToken 左括号token
-     * @return
+     * @return 一个括号子树
      */
     private TreeNode processBracketTree(boolean greedLogicToken, Token lbracketToken){
-        TreeNode.BracketTreeNode result = new TreeNode.BracketTreeNode();
+        BracketTreeNode result = new BracketTreeNode();
         result.setLbracketToken(lbracketToken);
         Token perReadToken = lexicalAnalysis.perReadToken();
         if(perReadToken == null){
@@ -294,7 +297,7 @@ public class Parser {
         }else if(perReadToken.getType().equals(Token.Type.rbracket)){
             // 空括号
             lexicalAnalysis.nextToken();
-            result.setInnerStatement(new TreeNode.EmptyTreeNode());
+            result.setInnerStatement(new EmptyTreeNode());
             result.setRbracketToken(lexicalAnalysis.token());
             return result;
         } else{
@@ -342,14 +345,14 @@ public class Parser {
      * 处理一个逻辑运算子树
      * @param leftTree 逻辑运算树左侧子树
      * @param logicCalcToken 逻辑运算token
-     * @return
+     * @return 一个逻辑运算子树
      */
-    private TreeNode.LogicCalcTreeNode processLogicCalcTree(TreeNode leftTree, Token logicCalcToken){
-        TreeNode.LogicCalcTreeNode result = new TreeNode.LogicCalcTreeNode();
+    private LogicCalcTreeNode processLogicCalcTree(TreeNode leftTree, Token logicCalcToken){
+        LogicCalcTreeNode result = new LogicCalcTreeNode();
         switch (logicCalcToken.getType()){
             case not:
                 if(leftTree !=null){
-                    if(!leftTree.getClass().equals(TreeNode.BracketTreeNode.class)){
+                    if(!leftTree.getClass().equals(BracketTreeNode.class)){
                         throw new DSLSyntaxException(logicCalcToken, source, "逻辑运算符not 不能有左子树");
                     }
                 }
@@ -359,7 +362,7 @@ public class Parser {
                     throw new DSLSyntaxException(logicCalcToken, source, "not 逻辑运算符后没有token！！！");
                 }
                 TreeNode rightTree = getSubTreeNode(false,null, lexicalAnalysis.token());
-                TreeNode.LogicCalcTreeNode.SubTreeNode rightSubTree = new TreeNode.LogicCalcTreeNode.SubTreeNode();
+                LogicCalcTreeNode.SubTreeNode rightSubTree = new LogicCalcTreeNode.SubTreeNode();
                 rightSubTree.setSubTreeNode(rightTree);
                 result.setRightSubNode(rightSubTree);
                 break;
@@ -381,10 +384,10 @@ public class Parser {
                         rightTree = processLogicCalcTree(rightTree, lexicalAnalysis.token());
                     }
                 }
-                rightSubTree = new TreeNode.LogicCalcTreeNode.SubTreeNode();
+                rightSubTree = new LogicCalcTreeNode.SubTreeNode();
                 rightSubTree.setSubTreeNode(rightTree);
                 result.setRightSubNode(rightSubTree);
-                TreeNode.LogicCalcTreeNode.SubTreeNode leftSubTree = new TreeNode.LogicCalcTreeNode.SubTreeNode();
+                LogicCalcTreeNode.SubTreeNode leftSubTree = new LogicCalcTreeNode.SubTreeNode();
                 leftSubTree.setSubTreeNode(leftTree);
                 result.setLeftSubNode(leftSubTree);
                 result.setLogicCalcToken(logicCalcToken);
@@ -399,19 +402,19 @@ public class Parser {
      * 处理一个聚合子树
      * @param leftTree 聚合前的过滤子树
      * @param groupToken group token
-     * @return
+     * @return 一个带有聚合运算的查询子树
      */
-    private TreeNode.AggregationTreeNode processAggregationTree(TreeNode leftTree, Token groupToken){
-        TreeNode.AggregationTreeNode aggregationTreeNode = new TreeNode.AggregationTreeNode();
+    private AggregationTreeNode processAggregationTree(TreeNode leftTree, Token groupToken){
+        AggregationTreeNode aggregationTreeNode = new AggregationTreeNode();
         aggregationTreeNode.setFilterTree(leftTree);
         acceptNextToken(groupToken, Collections.singletonList(Token.Type.by), "[group]后必须跟随[by]");
         lexicalAnalysis.nextToken();
         acceptNextToken(groupToken, Collections.singletonList(Token.Type.lbracket), "[group by]后必须跟随[()]");
         lexicalAnalysis.nextToken();
-        TreeNode.BracketTreeNode bracketTree = (TreeNode.BracketTreeNode)processBracketTree(false, lexicalAnalysis.currentToken);
+        BracketTreeNode bracketTree = (BracketTreeNode)processBracketTree(false, lexicalAnalysis.currentToken);
         // (LiteralValue ) 会被解析为 MultiFieldMatchTreeNode 类型的树节点
-        if(bracketTree.getInnerNode().getClass().equals(TreeNode.MultiFieldMatchTreeNode.class)){
-            TreeNode.MultiFieldMatchTreeNode multiFieldMatchTreeNode = (TreeNode.MultiFieldMatchTreeNode)bracketTree.getInnerNode();
+        if(bracketTree.getInnerNode().getClass().equals(MultiFieldMatchTreeNode.class)){
+            MultiFieldMatchTreeNode multiFieldMatchTreeNode = (MultiFieldMatchTreeNode)bracketTree.getInnerNode();
             aggregationTreeNode.setAggregationFiledToken(multiFieldMatchTreeNode.getLiteralValueTreeNode());
         }else{
             String errMsg =String.format("group by()中，by()括号内仅允许为简单字面量字符串！！！,当前值[%s]",bracketTree.getInnerNode().toSourceStr());
@@ -437,16 +440,20 @@ public class Parser {
      * 处理一个限制查询结果集数量子树
      * @param searchStatement 限制条件前的查询表达式树
      * @param limitToken limit token
-     * @return
+     * @return 一个带有限制查询结果条数的查询子树
      */
-    private TreeNode.LimitResultTreeNode processLimitResultTree(TreeNode searchStatement,Token limitToken){
-        TreeNode.LimitResultTreeNode result = new TreeNode.LimitResultTreeNode();
+    private LimitResultTreeNode processLimitResultTree(TreeNode searchStatement, Token limitToken){
+        LimitResultTreeNode result = new LimitResultTreeNode();
         if(searchStatement == null){
             throw new DSLSemanticsException("limit 表达式前必须有查询条件");
         }
         result.setSearchStatement(searchStatement);
         result.setLimitToken(limitToken);
-        acceptNextToken(limitToken,Arrays.asList(Token.Type.identifier,Token.Type.literalValue), "limit 关键字后需要的类型为 identifier或literalValue");
+        try{
+            acceptNextToken(limitToken,Arrays.asList(Token.Type.identifier,Token.Type.literalValue), "limit 关键字后需要的类型为 identifier或literalValue");
+        }catch (DSLExpectTokenNotExistException tokenNotExistException){
+            throw new DSLSyntaxException(limitToken, source,"limit关键字后应为限制的条数而非空！！！");
+        }
         lexicalAnalysis.nextToken();
         Token limitValueToken = lexicalAnalysis.token();
         try{
@@ -462,21 +469,53 @@ public class Parser {
     }
 
     /**
+     * 处理一个排序查询结果的查询子树
+     * @param searchTree 排序条件前的查询表达式树
+     * @param orderToken order token
+     * @return 一个带有使用指定属性排序的查询子树
+     */
+    private OrderResultTreeNode processOrderResultTree(TreeNode searchTree,Token orderToken){
+        OrderResultTreeNode result = new OrderResultTreeNode();
+        if(searchTree == null){
+            throw new DSLSemanticsException("order 表达式前必须有查询条件");
+        }
+        result.setSearchTree(searchTree);
+        acceptNextToken(orderToken, Collections.singletonList(Token.Type.by), "order 关键字后需要关键字 by");
+        lexicalAnalysis.nextToken();
+        acceptNextToken(lexicalAnalysis.token(), Collections.singletonList(Token.Type.lbracket), "order by 关键字后需要符号(");
+        lexicalAnalysis.nextToken();
+        acceptNextToken(lexicalAnalysis.token(),Collections.singletonList(Token.Type.identifier),"order by()语句 括号'()'内需要指定排序使用的属性名");
+        lexicalAnalysis.nextToken();
+        result.setOrderPropToken(lexicalAnalysis.token());
+        // 不支持 默认排序顺序，需要手动指定
+        acceptNextToken(lexicalAnalysis.token(),Arrays.asList(Token.Type.desc,Token.Type.asc),"order by()语句 括号'()'内需要指定使用的排序方法");
+        lexicalAnalysis.nextToken();
+        result.setOrderMethodToken(lexicalAnalysis.token());
+        try{
+            acceptNextToken(lexicalAnalysis.token(),Collections.singletonList(Token.Type.rbracket),"order by()语句 括号内仅有属性名与排序方法，且");
+            lexicalAnalysis.nextToken();
+        }catch (DSLExpectTokenNotExistException tokenNotExistException){
+            throw new DSLSyntaxException(lexicalAnalysis.token(), source, "order by() 语句括号未闭合！！！");
+        }
+        return result;
+    }
+
+    /**
      * !!!!! 调整优先级，暂不用此方法，目前通过处理逻辑子树时向右探查AND处理OR不处理，处理到下一次or逻辑来保证and优先级比or高 !!!!!
      * 调整and 与 or的优先级关系并返回调整后的子树
      * @param orLogicTree  or逻辑子树
      * @param rightTreeNode and逻辑子树的右子树
      * @return
      */
-    private TreeNode.LogicCalcTreeNode modifyPriorityOfAndOr(TreeNode.LogicCalcTreeNode orLogicTree, Token andToken, TreeNode rightTreeNode){
+    private LogicCalcTreeNode modifyPriorityOfAndOr(LogicCalcTreeNode orLogicTree, Token andToken, TreeNode rightTreeNode){
         if(orLogicTree.getLogicCalcToken().getType().equals(Token.Type.or)){
-            TreeNode.LogicCalcTreeNode.SubTreeNode orTreeRightSubTree = orLogicTree.getRightSubNode();
-            TreeNode.LogicCalcTreeNode midAndLogicTree = new TreeNode.LogicCalcTreeNode();
+            LogicCalcTreeNode.SubTreeNode orTreeRightSubTree = orLogicTree.getRightSubNode();
+            LogicCalcTreeNode midAndLogicTree = new LogicCalcTreeNode();
             // 调整逻辑关系
             midAndLogicTree.setLeftSubNode(orTreeRightSubTree);
             midAndLogicTree.setLogicCalcToken(andToken);
-            midAndLogicTree.setRightSubNode(new TreeNode.LogicCalcTreeNode.SubTreeNode(rightTreeNode));
-            orLogicTree.setRightSubNode(new TreeNode.LogicCalcTreeNode.SubTreeNode(midAndLogicTree));
+            midAndLogicTree.setRightSubNode(new LogicCalcTreeNode.SubTreeNode(rightTreeNode));
+            orLogicTree.setRightSubNode(new LogicCalcTreeNode.SubTreeNode(midAndLogicTree));
             return orLogicTree;
         }else {
             throw new DSLSyntaxException(andToken,source,"调整and与or的优先级时左子树必须为逻辑为or的逻辑运算子树");
@@ -489,8 +528,8 @@ public class Parser {
      * @return
      */
     private TreeNode processMultiField(Token literalValueToken){
-        TreeNode.MultiFieldMatchTreeNode result = new TreeNode.MultiFieldMatchTreeNode();
-        TreeNode.LiteralValueTreeNode literalValueTreeNode = new TreeNode.LiteralValueTreeNode(literalValueToken);
+        MultiFieldMatchTreeNode result = new MultiFieldMatchTreeNode();
+        LiteralValueTreeNode literalValueTreeNode = new LiteralValueTreeNode(literalValueToken);
         result.setLiteralValueTreeNode(literalValueTreeNode);
         return result;
     }
@@ -500,6 +539,8 @@ public class Parser {
      * @param currentToken 当前token
      * @param acceptTypes 期望的下一个token的类型
      * @param errMsg token类型不匹配时的异常消息
+     * @throws DSLSyntaxException 下一个token存在，但token类型不在期望的token列表中
+     * @throws DSLExpectTokenNotExistException 下一个token不存在，lexical 报告已到达末尾
      */
     private void acceptNextToken(Token currentToken,List<Token.Type> acceptTypes,String errMsg){
         Token perReadToken = lexicalAnalysis.perReadToken();

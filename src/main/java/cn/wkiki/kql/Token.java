@@ -64,6 +64,8 @@ public class Token {
         by("by"),
         limit("limit"),
         order("order"),
+        desc("desc"),
+        asc("asc"),
         // aggregation function
         avg("avg()"),
         stat("stat()"),

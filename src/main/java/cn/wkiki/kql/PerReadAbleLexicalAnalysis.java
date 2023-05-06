@@ -38,6 +38,8 @@ public class PerReadAbleLexicalAnalysis extends LexicalAnalysis{
                     case gte:
                     case lt:
                     case lte:
+                    case desc:
+                    case asc:
                         break;
                     default:
                         currentToken.setType(Token.Type.literalValue);
