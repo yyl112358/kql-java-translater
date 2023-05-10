@@ -1,4 +1,4 @@
-package cn.wkiki.kql.tree.TreeNodeImpl;
+package cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode;
 
 import cn.wkiki.kql.Token;
 import cn.wkiki.kql.TranslateContext;
@@ -8,17 +8,18 @@ import cn.wkiki.kql.queryUnit.FullTextMatch;
 import cn.wkiki.kql.queryUnit.PhraseMatch;
 import cn.wkiki.kql.queryUnit.QueryUnit;
 import cn.wkiki.kql.tree.TreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.BracketTreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.LogicCalcTreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.MultiFieldMatchTreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.PhraseLiteralValueTreeNode;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
  * 查询右侧带有括号"()"包裹的查询节点
  */
-public class MatchWithBracketTreeNode extends TreeNode {
+public class MatchWithBracketTreeNode extends FieldSearchTreeNode {
 
-    @Setter
-    @Getter
-    private FieldNameTreeNode fieldNameTreeNode;
     /**
      * 右侧括号节点
      */

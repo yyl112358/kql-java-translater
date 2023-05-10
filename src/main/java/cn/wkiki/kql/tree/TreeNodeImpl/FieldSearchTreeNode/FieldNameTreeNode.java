@@ -1,4 +1,4 @@
-package cn.wkiki.kql.tree.TreeNodeImpl;
+package cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode;
 
 import cn.wkiki.kql.Token;
 import cn.wkiki.kql.tree.TreeNode;

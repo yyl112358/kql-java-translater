@@ -6,7 +6,7 @@ import cn.wkiki.kql.es.IndexField;
 import cn.wkiki.kql.exception.DSLSemanticsException;
 import cn.wkiki.kql.model.DetailQueryParamBody;
 import cn.wkiki.kql.queryUnit.QueryUnit;
-import cn.wkiki.kql.tree.TreeNodeImpl.FieldNameTreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode.FieldNameTreeNode;
 import cn.wkiki.kql.util.GsonUtil;
 import com.google.gson.reflect.TypeToken;
 import org.apache.commons.collections4.CollectionUtils;

@@ -5,6 +5,7 @@ import cn.wkiki.kql.exception.DSLSemanticsException;
 import cn.wkiki.kql.exception.DSLSyntaxException;
 import cn.wkiki.kql.tree.TreeNode;
 import cn.wkiki.kql.tree.TreeNodeImpl.*;
+import cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode.*;
 import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.Arrays;
@@ -48,6 +49,13 @@ public class Parser {
     private TreeNode getSubTreeNode(boolean bracketGreedMatchLogicToken, TreeNode perTreeNode, Token startToken){
         switch (startToken.getType()){
             case identifier:
+                List<Token> perReadTokens = lexicalAnalysis.perReadToken(2);
+                if(perReadTokens.size() == 2){
+                    if(perReadTokens.get(0).getType().equals(Token.Type.colon)
+                        && perReadTokens.get(1).getType().equals(Token.Type.lbrace)){
+                        return processNestedMatchTree(startToken);
+                    }
+                }
                 return processTextMatchOrPhraseMatchOrRelation(startToken);
             case literalValue:
                 if(perTreeNode == null || perTreeNode.getClass().equals(LogicCalcTreeNode.class)
@@ -79,7 +87,7 @@ public class Parser {
             default:
                 String syntaxErrMsg="";
                 if(perTreeNode== null){
-                    syntaxErrMsg = String.format("第一个token只能以[%s,%s,%s,%s,%s]开头,当前token[%s]"
+                    syntaxErrMsg = String.format("未知的语法开始的token,目前语法树及子树仅支持[%s,%s,%s,%s,%s]开头,当前token[%s]"
                             ,Token.Type.identifier
                             ,Token.Type.literalValue
                             ,Token.Type.not
@@ -342,7 +350,9 @@ public class Parser {
     }
 
     /**
-     * 处理一个逻辑运算子树
+     * 处理一个逻辑运算子树，该方法对于token流中连续的and会在一次调用过程中将连续的and收集为一个子树
+     * 若 token流中连续的逻辑运算符中存在 or 连接的左右子树，则在此次处理过程中碰到or返回仅收集到的左子树
+     * or的右子树部分 在token流消费的下一次处理过程中处理以保证 and 子树在or子树下层
      * @param leftTree 逻辑运算树左侧子树
      * @param logicCalcToken 逻辑运算token
      * @return 一个逻辑运算子树
@@ -501,27 +511,54 @@ public class Parser {
     }
 
     /**
-     * !!!!! 调整优先级，暂不用此方法，目前通过处理逻辑子树时向右探查AND处理OR不处理，处理到下一次or逻辑来保证and优先级比or高 !!!!!
-     * 调整and 与 or的优先级关系并返回调整后的子树
-     * @param orLogicTree  or逻辑子树
-     * @param rightTreeNode and逻辑子树的右子树
+     * 从一个标识符token开始尝试构建一个内部属性查询树
+     *
+     * @param identifierToken
      * @return
      */
-    private LogicCalcTreeNode modifyPriorityOfAndOr(LogicCalcTreeNode orLogicTree, Token andToken, TreeNode rightTreeNode){
-        if(orLogicTree.getLogicCalcToken().getType().equals(Token.Type.or)){
-            LogicCalcTreeNode.SubTreeNode orTreeRightSubTree = orLogicTree.getRightSubNode();
-            LogicCalcTreeNode midAndLogicTree = new LogicCalcTreeNode();
-            // 调整逻辑关系
-            midAndLogicTree.setLeftSubNode(orTreeRightSubTree);
-            midAndLogicTree.setLogicCalcToken(andToken);
-            midAndLogicTree.setRightSubNode(new LogicCalcTreeNode.SubTreeNode(rightTreeNode));
-            orLogicTree.setRightSubNode(new LogicCalcTreeNode.SubTreeNode(midAndLogicTree));
-            return orLogicTree;
-        }else {
-            throw new DSLSyntaxException(andToken,source,"调整and与or的优先级时左子树必须为逻辑为or的逻辑运算子树");
+    private NestedMatchTreeNode processNestedMatchTree(Token identifierToken){
+        List<Token> perReadTokens = lexicalAnalysis.perReadToken(2);
+        if(perReadTokens.size() == 2){
+            if(perReadTokens.get(0).getType().equals(Token.Type.colon)
+                    && perReadTokens.get(1).getType().equals(Token.Type.lbrace)){
+                lexicalAnalysis.nextToken();
+                lexicalAnalysis.nextToken();
+                Token nextToken = lexicalAnalysis.perReadToken();
+                if(nextToken !=null){
+                    if(nextToken.getType().equals(Token.Type.rbrace)){
+                        throw new DSLSyntaxException(identifierToken,source,"内部属性查询不支持空的子属性查询！！！");
+                    }else{
+                        lexicalAnalysis.nextToken();
+                        NestedMatchTreeNode result = new NestedMatchTreeNode();
+                        result.setOutFieldNameToken(identifierToken);
+                        TreeNode nestedFilterTreeNode = getSubTreeNode(false, null,lexicalAnalysis.token());
+                        nextToken = lexicalAnalysis.perReadToken();
+                        if(nextToken!=null && (nextToken.getType().equals(Token.Type.and)||nextToken.getType().equals(Token.Type.or))){
+                            // 收集内部整个的逻辑运算子树
+                            do{
+                                lexicalAnalysis.nextToken();
+                                nestedFilterTreeNode = processLogicCalcTree(nestedFilterTreeNode, lexicalAnalysis.token());
+                                nextToken = lexicalAnalysis.perReadToken();
+                            }while (nextToken!=null&& nextToken.getType().equals(Token.Type.or));
+                        }
+                        if(nextToken == null || !nextToken.getType().equals(Token.Type.rbrace)){
+                            throw  new DSLSyntaxException(lexicalAnalysis.token(), source, "内部属性查询{}未闭合");
+                        }else{
+                            lexicalAnalysis.nextToken();
+                            result.setNestedFilterTree(nestedFilterTreeNode);
+                            return result;
+                        }
+                    }
+                }else{
+                    throw new DSLSyntaxException(identifierToken, source, "构建内部查询语法树失败，失败原因，没有足够的token可供消费！！");
+                }
+            }else{
+                throw new DSLSyntaxException(identifierToken, source, "内部属性查询 identifier token后必须有[:]与[{]符号！！！");
+            }
+        }else{
+            throw new DSLSyntaxException(identifierToken, source, "内部属性查询 identifier token后符号数量不足两个，无法构成内部查询语法树！！！");
         }
     }
-
     /**
      * 处理一个多字段匹配子树
      * @param literalValueToken 字面量token
@@ -552,5 +589,6 @@ public class Parser {
             throw new DSLExpectTokenNotExistException(currentToken, source, "已达到token流末尾！！！");
         }
     }
+
 
 }

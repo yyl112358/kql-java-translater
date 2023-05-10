@@ -33,7 +33,8 @@ public class TestClient {
                 TreeNode astRootNode = parser.getAST();
                 DetailQueryParamBody queryParamBody = astRootNode.toQueryParamBody(null);
                 Request request = new Request("GET", "/lj/_search");
-                request.setJsonEntity(GsonUtil.getInstance().toJson(queryParamBody));
+                String requestBody = GsonUtil.getInstanceWithPretty().toJson(queryParamBody);
+                request.setJsonEntity(requestBody);
                 Response response = client.getLowLevelClient().performRequest(request);
                 String responseEntity = EntityUtils.toString(response.getEntity());
                 HashMap<String,Object> responseObj = GsonUtil.getInstance().fromJson(responseEntity, new TypeToken<HashMap<String,Object>>(){}.getType());
@@ -47,7 +48,7 @@ public class TestClient {
 
 
     public static RestHighLevelClient getClient() {
-        String instance1 = "localhost:9200";
+        String instance1 = "ubuntu:9200";
         HttpHost[] clusters = new HttpHost[]{
                 new HttpHost(instance1.split(":")[0], Integer.parseInt(instance1.split(":")[1]))
         };

@@ -105,16 +105,9 @@ public class DateFieldRelationSearch extends FieldRelationSearch<LocalDateTime>{
 
     @Getter
     @Setter
-    static class RelationSearchConfig{
+    static class RelationSearchConfig extends FieldRelationSearch.RelationSearchConfig<String>{
 
         String format;
 
-        Object gt;
-
-        Object gte;
-
-        Object lt;
-
-        Object lte;
     }
 }

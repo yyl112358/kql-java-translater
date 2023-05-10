@@ -2,7 +2,7 @@ package cn.wkiki.kql.tree;
 
 
 import cn.wkiki.kql.Token;
-import cn.wkiki.kql.tree.TreeNodeImpl.FieldNameTreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode.FieldNameTreeNode;
 import cn.wkiki.kql.tree.TreeNodeImpl.LiteralValueTreeNode;
 import cn.wkiki.kql.tree.TreeNodeImpl.PhraseLiteralValueTreeNode;
 

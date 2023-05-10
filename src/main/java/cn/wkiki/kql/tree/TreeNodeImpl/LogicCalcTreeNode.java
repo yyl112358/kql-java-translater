@@ -6,6 +6,7 @@ import cn.wkiki.kql.queryUnit.BooleanQuery;
 import cn.wkiki.kql.queryUnit.QueryUnit;
 import cn.wkiki.kql.tree.LogicCalcStatement;
 import cn.wkiki.kql.tree.TreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode.*;
 import lombok.Getter;
 
 import java.util.Arrays;
@@ -59,24 +60,26 @@ public class LogicCalcTreeNode extends TreeNode implements LogicCalcStatement {
             this.setSubTreeNode(subTreeNode);
         }
 
-        final Class[] acceptSubTreeNodeClazz = new Class[]{TextMatchTreeNode.class,
+        final Class<?>[] acceptSubTreeNodeClazz = new Class[]{TextMatchTreeNode.class,
                 MatchPhraseTreeNode.class,
                 MultiFieldMatchTreeNode.class,
                 RelationCalcTreeNode.class,
                 LogicCalcTreeNode.class,
                 BracketTreeNode.class,
                 PhraseLiteralValueTreeNode.class,
-                MatchWithBracketTreeNode.class};
+                MatchWithBracketTreeNode.class,
+                NestedMatchTreeNode.class
+        };
 
         @Getter
         private TreeNode subTreeNode;
 
         @Getter
-        private Class subTreeNodeClazz;
+        private Class<?> subTreeNodeClazz;
 
         public void setSubTreeNode(TreeNode subTreeNode) {
             if (this.subTreeNodeClazz == null) {
-                final Class subTreeNodeClazz = subTreeNode.getClass();
+                final Class<? extends TreeNode> subTreeNodeClazz = subTreeNode.getClass();
                 if (Arrays.stream(acceptSubTreeNodeClazz).anyMatch(t -> t.equals(subTreeNodeClazz))) {
                     this.subTreeNode = subTreeNode;
                     this.subTreeNodeClazz = subTreeNodeClazz;

@@ -86,7 +86,7 @@ public class FieldRelationSearch<T> extends FieldSearchUnit{
 
         RelationSearchTemplate(String fieldName,Token.Type relationType,Token.Type secondRelationType,T relationCalcValue,T secondCalcValue){
             range = new HashMap<>();
-            RelationSearchConfig relationSearchConfig = new RelationSearchConfig();
+            RelationSearchConfig<T> relationSearchConfig = new RelationSearchConfig<>();
             switch (relationType){
                 case lt:
                     relationSearchConfig.setLt(relationCalcValue);
@@ -127,14 +127,14 @@ public class FieldRelationSearch<T> extends FieldSearchUnit{
 
     @Getter
     @Setter
-    static class RelationSearchConfig{
+    static class RelationSearchConfig<T>{
 
-        Object gt;
+        T gt;
 
-        Object gte;
+        T gte;
 
-        Object lt;
+        T lt;
 
-        Object lte;
+        T lte;
     }
 }

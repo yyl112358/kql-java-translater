@@ -1,4 +1,4 @@
-package cn.wkiki.kql.tree.TreeNodeImpl;
+package cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode;
 
 import cn.wkiki.kql.Token;
 import cn.wkiki.kql.TranslateContext;
@@ -6,16 +6,15 @@ import cn.wkiki.kql.exception.DSLSemanticsException;
 import cn.wkiki.kql.queryUnit.FieldRelationSearch;
 import cn.wkiki.kql.queryUnit.QueryUnit;
 import cn.wkiki.kql.tree.RelationCalcStatement;
-import cn.wkiki.kql.tree.TreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.LiteralValueTreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.PhraseLiteralValueTreeNode;
 import lombok.Getter;
 
 /**
  * 关系查询节点
  */
-public class RelationCalcTreeNode extends TreeNode implements RelationCalcStatement {
+public class RelationCalcTreeNode extends FieldSearchTreeNode implements RelationCalcStatement {
 
-    @Getter
-    private FieldNameTreeNode fieldNameTreeNode;
     @Getter
     private Token relationCalcToken;
     @Getter
@@ -24,10 +23,6 @@ public class RelationCalcTreeNode extends TreeNode implements RelationCalcStatem
     private LiteralValueTreeNode literalValueTreeNode;
     @Getter
     private PhraseLiteralValueTreeNode phraseLiteralValueTreeNode;
-
-    public void setFieldNameTreeNode(FieldNameTreeNode fieldNameTreeNode) {
-        this.fieldNameTreeNode = fieldNameTreeNode;
-    }
 
     @Override
     public void setRelationCalcToken(Token relationCalcToken) {
@@ -111,16 +106,13 @@ public class RelationCalcTreeNode extends TreeNode implements RelationCalcStatem
                 // do nothing
             }
         }
+        String fieldName = isNestedProp()?getNestedPropName():fieldNameTreeNode.getFieldNameToken().getValue();
         if (intValue != null) {
-            return new FieldRelationSearch<>(getFieldNameTreeNode().getFieldNameToken().getValue(),
-                    getRelationCalcToken().getType(), intValue);
+            return new FieldRelationSearch<>(fieldName, getRelationCalcToken().getType(), intValue);
         } else if (doubleValue != null) {
-            return new FieldRelationSearch<>(getFieldNameTreeNode().getFieldNameToken().getValue(),
-                    getRelationCalcToken().getType(), doubleValue);
+            return new FieldRelationSearch<>(fieldName, getRelationCalcToken().getType(), doubleValue);
         } else {
-            return new FieldRelationSearch<>(getFieldNameTreeNode().getFieldNameToken().getValue(),
-                    getRelationCalcToken().getType(),
-                    literalValue);
+            return new FieldRelationSearch<>(fieldName, getRelationCalcToken().getType(), literalValue);
         }
     }
 }

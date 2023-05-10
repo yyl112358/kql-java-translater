@@ -24,7 +24,7 @@ public class DetailQueryParamBody {
      */
     private List<Map<String,String>> sort;
     /**
-     * 查询size default 10
+     * 查询size default 5
      */
-    private int size = 10;
+    private int size = 5;
 }

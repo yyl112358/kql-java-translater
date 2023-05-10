@@ -47,6 +47,9 @@ public class LexicalTest {
         assert matched;
     }
 
+    /**
+     * 测试在尝试匹配literalValue时 出现在最后的关键字
+     */
     @Test
     public void testMatchLastKeyWord(){
         String[] statements = new String[]{"a:b and","a:b and c:or"};
@@ -67,5 +70,28 @@ public class LexicalTest {
         }
         assert matchedAnd;
         assert matchedOr;
+    }
+
+    /**
+     * 测试匹配内查询使用的左右花括号
+     */
+    @Test
+    public void testMatchBrace(){
+        String statement = "apartment_city:北京 or update_time_inner{month:5 and day:20}";
+        LexicalAnalysis lexicalAnalysis = new LexicalAnalysis(statement);
+        lexicalAnalysis.nextToken();
+        boolean lmatched = false,rmatched= false;
+        while (lexicalAnalysis.token() !=null){
+            System.out.println(lexicalAnalysis.token());
+            if(lexicalAnalysis.token().getType().equals(Token.Type.lbrace)){
+                lmatched = true;
+            }
+            if(lexicalAnalysis.token().getType().equals(Token.Type.rbrace)){
+                rmatched = true;
+            }
+            lexicalAnalysis.nextToken();
+        }
+        assert lmatched && rmatched;
+
     }
 }

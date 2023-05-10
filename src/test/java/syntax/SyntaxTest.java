@@ -13,8 +13,11 @@ import java.util.List;
 import java.util.Objects;
 
 @RunWith(JUnit4.class)
-public class syntaxTest {
+public class SyntaxTest {
 
+    /**
+     * 测试识别limit 语法
+     */
     @Test
     public void testIdentifyLimitSyntax(){
         String statement = "apartment_city:北京 limit 50";
@@ -44,6 +47,9 @@ public class syntaxTest {
         Assert.assertEquals(exceptions.size(), 3);
     }
 
+    /**
+     * 测试识别 order by 语法
+     */
     @Test
     public void testIdentifyOrderStatement(){
         String[] statements = new String[]{
@@ -86,6 +92,54 @@ public class syntaxTest {
             }
         }
         assert treeNodes.size() == 2;
+        assert Arrays.stream(exceptions).filter(Objects::nonNull).count() == statements.length - treeNodes.size();
+    }
+
+    @Test
+    public void testIdentifyNestedSearchStatement(){
+        String[] statements = new String[]{
+                "update_time_inner:{month:5 and day>1}",
+                "update_time_inner:{(month:5 and day>1)}",
+                "update_time_inner:{month:5 and day>1 or test:\"hello world\"}",
+                "update_time_inner:{month:5}",
+                "update_time_inner:{month:5",
+                "update_time_inner:{month:}",
+                "update_time_inner:{month}",
+                "update_time_inner:{}",
+                "update_time_inner:{ ",
+                "update_time_inner:{month:5}}",
+                "update_time_inner:{{month:5}",
+                "update_time_inner:{{month:5}}"
+        };
+        Exception[] exceptions = new Exception[statements.length];
+        List<TreeNode> treeNodes = new ArrayList<>(10);
+        for (int i = 0; i < statements.length; i++) {
+            String statement = statements[i];
+            Parser parser = new Parser(statement);
+            try{
+                TreeNode rootNode = parser.getAST();
+                if(rootNode !=null){
+                    treeNodes.add(rootNode);
+                }
+            }catch (Exception e){
+                exceptions[i] = e;
+            }
+        }
+        System.out.printf("identify success count [%d]\n,exception count [%d]\n",treeNodes.size(),exceptions.length);
+        System.out.println("---------success---------");
+        for (TreeNode node : treeNodes) {
+            System.out.println(node.toSourceStr());
+        }
+        System.out.println("\n---------exception---------\n");
+        for (int i = 0; i < exceptions.length; i++) {
+            Exception exception = exceptions[i];
+            if(exception != null){
+                System.out.println("source ---> "+statements[i]);
+                System.out.println("exception ---> "+exceptions[i]);
+                System.out.println("-------------------------------------");
+            }
+        }
+        assert treeNodes.size() == 3;
         assert Arrays.stream(exceptions).filter(Objects::nonNull).count() == statements.length - treeNodes.size();
     }
 }

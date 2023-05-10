@@ -1,6 +1,6 @@
 package cn.wkiki.kql.tree;
 
-import cn.wkiki.kql.tree.TreeNodeImpl.FieldNameTreeNode;
+import cn.wkiki.kql.tree.TreeNodeImpl.FieldSearchTreeNode.FieldNameTreeNode;
 import cn.wkiki.kql.tree.TreeNodeImpl.LiteralValueTreeNode;
 
 /**

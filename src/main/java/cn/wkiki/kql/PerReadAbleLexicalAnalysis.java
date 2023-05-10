@@ -75,6 +75,15 @@ public class PerReadAbleLexicalAnalysis extends LexicalAnalysis{
         return tokensBuffer.stream().limit(perReadSize).map(Token::copySelf).collect(Collectors.toList());
     }
 
+    @Override
+    public Token pervToken() {
+        if(tokensBuffer.size()>0){
+            return tokensBuffer.getLast();
+        }else{
+            return super.pervToken();
+        }
+    }
+
     /**
      * 向后预读一个token ，但不移动当前消费到的token的位置,此操作不影响pervToken的值，pervToken仍为预读前的值
      * @return 预读到的token或null(token流已空)
